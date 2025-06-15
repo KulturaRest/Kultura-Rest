@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 7. Відправка POST-запиту на AWS API Gateway
     try {
       const response = await fetch(
-        "https://9ka7vobns7.execute-api.eu-north-1.amazonaws.com/api/booking",
+        "https://veii5a3nu7ywmveqyav3zytgwu0fbvrn.lambda-url.eu-north-1.on.aws/booking",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
