@@ -4,7 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Якщо відкрито через file:// — попередження
   if (window.location.protocol === "file:") {
     console.warn(
-      "Для коректної роботи запитів необхідно запускати сайт через HTTP-сервер (наприклад, python -m http.server)."
+      "Для коректної роботи запитів необхідно запускати сайт через HTTP-сервер " +
+      "(наприклад, python -m http.server)."
     );
   }
 
@@ -31,85 +32,71 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async e => {
     e.preventDefault();
 
-    // 3. Збір даних
-    const name = document.getElementById("reservation-name").value.trim();
-    const phone = document.getElementById("reservation-phone").value.trim();
-    const date = document.getElementById("reservation-date").value;
-    const time = document.getElementById("reservation-time").value;
-    const guests = parseInt(
-      document.getElementById("reservation-guests").value,
-      10
-    );
-    const message = document
-      .getElementById("reservation-message")
-      .value.trim();
+    // 3. Збір даних (зберігаємо кількість гостей як рядок для відправки)
+    const name     = form.name.value.trim();
+    const phone    = form.phone.value.trim();
+    const date     = form.reservation_date.value;
+    const time     = form.reservation_time.value;
+    const guestsStr = form.reservation_guests.value;          // рядок, напр. "4"
+    const message  = form.message.value.trim();
 
-    // 4. Просте віконне повідомлення про помилки валідації
-    if (!name || !phone || !date || !time || isNaN(guests)) {
-      alert("Будь ласка, заповніть усі обов'язкові поля.");
+    // для алгоритму вибору столу потрібно числове значення
+    const guestsNum = parseInt(guestsStr, 10);
+
+    // 4. Валідація
+    if (!name || !phone || !date || !time || !guestsStr || isNaN(guestsNum)) {
+      alert("Будь ласка, заповніть усі обов’язкові поля правильно.");
       return;
     }
 
-    // 5. Автоматичний вибір столу
-    const tableId = pickRandomTable(guests);
+    // 5. Випадкове призначення столу
+    const tableId = pickRandomTable(guestsNum);
     if (!tableId) {
-      alert("Немає вільного столу для такої кількості гостей.");
+      alert("Немає вільного столу для цієї кількості гостей.");
       return;
     }
     tableInput.value = tableId;
 
-    // 6. Підготовка payload
+    // 6. Формуємо дані для відправки (reservation_guests як рядок)
     const formData = {
       name,
       phone,
       reservation_date: date,
       reservation_time: time,
-      reservation_guests: guests,
+      reservation_guests: guestsStr,   // тепер рядок
       table_id: tableId,
       message
     };
 
-    // 7. Логування перед відправкою
+    // 7. Ваш Function URL
     const apiUrl =
-      "https://veii5a3nu7ywmveqyav3zytgwu0fbvrn.lambda-url.eu-north-1.on.aws/booking";
-    console.log("Відправляю запит на:", apiUrl, formData);
+      "https://veii5a3nu7ywmveqyav3zytgwu0fbvrn.lambda-url.eu-north-1.on.aws";
 
-    // 8. POST-запит із налаштуваннями для CORS
+    console.log("Відправка POST на:", apiUrl, formData);
+
     try {
       const response = await fetch(apiUrl, {
         method: "POST",
-        mode: "cors",        // дозволити крос-доменні запити
-        cache: "no-cache",   // без кешування
-        headers: {
-          "Content-Type": "application/json"
-        },
+        mode: "cors",
+        cache: "no-cache",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
 
-      // 9. Обробка HTTP-статусу
       if (!response.ok) {
+        const text = await response.text();
+        console.error("Lambda відповіла не-OK:", response.status, text);
         throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
 
-      // 10. Опціонально: розбір JSON-відповіді
-      let resultText = "";
-      try {
-        const result = await response.json();
-        console.log("Відповідь сервера:", result);
-        resultText = result.message || "";
-      } catch {
-        // якщо не JSON — ігноруємо
-      }
-
-      alert(
-        `Бронювання підтверджено! Стіл №${tableId}. ${resultText}`.trim()
-      );
+      // Успішне бронювання
+      alert(`Бронювання підтверджено! Стіл №${tableId}.`);
       form.reset();
-    } catch (error) {
-      console.error("Помилка при відправці:", error);
+    } catch (err) {
+      console.error("Помилка при відправці:", err);
       alert(
-        `Не вдалося надіслати дані. ${error.message ||
-          "Перевірте з’єднання або CORS-настройки API."}`
+        `Не вдалося надіслати дані: ${err.message}. ` +
+        `Перевірте CORS-настройки Lambda або статус Function URL.`
       );
     }
   });
